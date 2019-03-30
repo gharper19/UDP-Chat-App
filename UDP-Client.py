@@ -4,37 +4,43 @@ import time
 import socket
 import sys
 
+'''
 print("Welcome to HELL")
 print("")
 print("Initializing...")
 time.sleep(1)
-
+'''
 
 # Bind client socket
-clientHost = socket.gethostname() # "127.0.0.1"
+clientHost = '127.0.0.1'
 clientPort = 9996
 s =socket.socket()
-s.bind((clientHost, clientPort)) 
+# s.bind((clientHost, clientPort)) 
 
 print("")
 
+'''  Skipped for debugging
 # Get Server data from user
 host = input(str("Please enter the server address : "))
 name = input(str("Please enter your name : "))
+'''
+
+host = '127.0.0.1'   #'192.168.56.1'#input(str("Please enter the server address : "))#.trim()
+name = "jhon test"
 port = 9998 # Or should it be 1024 (server rcv-from port?) 
 server = (host,port)
 
 # Initialize Client as active with server
 print("trying to connect to ", host , "at port", port)
-time.sleep(1)
+# time.sleep(1)
 
 s.sendto( name.encode("ascii"), server)
 print("connected..")
 
 
 # connection has been established
-userList = s.recv(1023)  # Set port # different from server's
-users = userList.decode() # recieved user list may need to be parsed or converted to list for later comparison
+userList = s.recv(1026)  # Set port # different from server's
+users = userList.decode() # recieved user lisdst may need to be parsed or converted to list for later comparison
 print(users)
 
 stayOnServer = True
@@ -76,3 +82,5 @@ while stayOnServer:
 
 print("GoodBye!")
 
+
+input("Enter to close")
