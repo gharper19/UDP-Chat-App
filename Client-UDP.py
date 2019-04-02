@@ -7,7 +7,7 @@ import socket
 
 exitFlag = 0
 class ClientThread (threading.Thread):
-    def __init__(self, threadID, name, counter):
+    def __init__(self, threadID, name, counter, sendmsg=False, requestUsers=False):
         threading.Thread.__init__(self)
         self.threadID = threadID
         self.name = name
@@ -50,16 +50,15 @@ def init_client():
     # time.sleep(1)
     try: 
         clientSock.sendto(name.encode("ascii"), server)
-        
+
         # Wait for userId and user list, then parse
         msg = clientSock.recvfrom(1026)[0]
         msg.decode('utf-8')
-        print(msg)
         userName, userlist = msg.split(" /$MESSAGE_BREAK: ")
         print("connected..")
+        print(userlist)
     except Exception as e: 
         print("Error Initiating with server." + str(e))
-        input("Press Enter")
         raise e
     return clientSock, server
 
@@ -78,14 +77,6 @@ def send_message(rcv_user):
 def main_loop():
     # Gets users name, initiates socket , and gets username and userlist from server    
     socket, server = init_client()
-    input()
-    return
-    # Listens for messages from 
-    '''
-    userList = s.recv(1026)  # Set port # different from server's
-    users = userList.decode() # recieved user list may need to be parsed or converted to list for later comparison
-    print(users)
-    '''
 
     stayOnServer = True
     while stayOnServer: 

@@ -56,34 +56,6 @@ def init_server():
 
     print("Server Initialized at %s", str(serverSock))
     return serverSock 
-
-'''
-def recieve_message(clientAddr, clientData): 
-    # Client UDP Data must be delimited to determine message receiver 
-    rcv_user = clientData.split(" /$MESSAGE_BREAK: ")[0]
-    try: 
-        message = "From " + IPs[clientAddr] + ': ' + clientData.split(" /$MESSAGE_BREAK: ")[1]
-        
-        # Add error handling for user not found
-
-
-        # Get IP address from user list
-        destination = users[rcv_user]
-        
-        # Separate Address and port by ':' delimiter
-        rcv_addr, rcv_port = destination.split(':')[0], destination.split(':')[1]
-        
-        print("User " + users[clientAddr] + " sending message to "+  users[destination] +  " at  " + destination + " ...")
-
-        # EExit for now 
-        input("Done Processing.. Press Enter"); 
-    except Exception as e: 
-        print("Formatting Error: " + str(e))
-        break
-
-    # Send message to receiving IP address and port
-    serverSock.sendto(message.encode, (rcv_addr, rcv_port))
-'''
         
 def init_user(clientAddr, clientData, threadName):
 # Add client to lists and send back username and IP address
@@ -103,17 +75,35 @@ def init_user(clientAddr, clientData, threadName):
             print("Username %s unavailable" % username)  
 
     # Send list of connected users to newly initialized user 
-    resp = username + " /$MESSAGE_BREAK: " + str(users.keys) 
+    for name in users:
+        if name == users[len(users-1)]:
+            userlist += name
+        else: userlist += name + ' - '
+    resp = username + " /$MESSAGE_BREAK: " + userlist
     serverSock.sendto(
         resp.encode('ascii'), 
         clientAddr 
         ) 
-    print("New User Initialized!")
+    print("New User %s Initialized!" % username)
 
 def handle_user(clientAddr, clientData, threadName):
     print(threadName + ": Message Recieved from " + IP[clientAddr] + " at " + clientAddr  + " requesting username " + clientData )
     
-# ! Each User gets a thread on the server
+    # Client UDP Data must be delimited to determine message receiver 
+    rcv_user, user_msg = clientData.split(" /$MESSAGE_BREAK: ")[0], clientData.split(" /$MESSAGE_BREAK: ")[1]
+    try: 
+        # ! Add error handling for user not found
+        message = "From " + IPs[clientAddr] + ': ' + user_msg      
+        rcv_addr, rcv_port =  users[rcv_user]         
+        print("User %s messaging %s at %s:%d .." % str(users[clientAddr]), rcv_user , rcv_addr, rcv_port)
+        serverSock.sendto(message.encode, (rcv_addr, rcv_port))
+    except Exception as e: 
+        print("Error Handling User Messaging: " + str(e))
+
+    # Send message to receiving IP address and port
+    print("Message Sent!"); 
+
+# ! strip() strings on user input
 def main_loop():
     print("Server Online ... Waiting for connections: \n")
     threadCount = 1
