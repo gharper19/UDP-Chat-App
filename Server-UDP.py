@@ -100,7 +100,6 @@ def handle_user(clientAddr, clientData, threadName):
     rcv_user, user_msg = clientData.decode('utf-8').split(" /$MESSAGE_BREAK: ")[0], clientData.split(" /$MESSAGE_BREAK: ")[1]
     try: 
         # ! Add error handling for user not found and user is self
-        
         message = "From " + IPs[clientAddr] + ': ' + user_msg      
         rcv_addr, rcv_port =  users[rcv_user]         
         print("User %s messaging %s at %s:%d .." % str(users[clientAddr]), rcv_user , rcv_addr, rcv_port)

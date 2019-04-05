@@ -10,8 +10,11 @@ serverPort = 9997
 clientSock.bind((serverHost, 9998))
 
 # Take user input as text for message and send datagram to server socket
-print("Sending to server at %s" %serverHost)
-clientSock.sendto(b"Greetings Server!", (serverHost, serverPort))
+try:     
+    clientSock.sendto(b"Greetings Server!", (serverHost, serverPort))
+    print("Sending to server at %s" %serverHost)
+except Exception as e:
+    print("error %s" % e)
 '''
 try: 
     print(clientSock.recvfrom(1026))

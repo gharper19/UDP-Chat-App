@@ -26,14 +26,13 @@ class myThread (threading.Thread):
             except Exception as e: 
                 print("Error running client: %s" % e)
                 break
-        input("Press Enter ...")
 
-def run_client(name, clientSocket):
+def run_client(name, clientSocket): # <--- clientSocket not neccessary , use global socket
     # Take user input as text for message and send datagram to server socket
     msg = "Hey there Server! - from %s" % name
     try:
         clientSock.sendto(msg.encode('ascii'), (serverHost, serverPort))
-        print("%s: Sent" % name )
+        print("%s: Sent\n" % name )
     except Exception as e: 
         print("Error Sending Client Message")
         raise e
@@ -66,3 +65,6 @@ while 1:
 
 ## Client can send from two threads with same BINDED socket just fine as is, but throws an exception at some point after finishing for using same port
 # can server recieve from both threads as a binded socket
+
+### !!!! Okay i just looked and the clientSock obj is global and thats what is working in run_client not the clientSocket param i pass in
+### So you cant pass sockets around but you CAN use same socket obj in two diff 

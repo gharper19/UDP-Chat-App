@@ -19,6 +19,7 @@ class ClientThread (threading.Thread):
             wait_for_resp(user=True)
 
 '''
+
 # Create new threads
 thread1 = myThread(1, "Thread-1", 1)
 thread2 = myThread(2, "Thread-2", 2)
