@@ -54,7 +54,7 @@ def init_server():
     serverPort = 9997
     serverSock.bind((serverHost, serverPort))
 
-    print("Server Initialized at %s", str(serverSock))
+    print("Server Initialized at %s" % serverSock)
     return serverSock 
         
 def init_user(clientAddr, clientData, threadName):
@@ -75,10 +75,17 @@ def init_user(clientAddr, clientData, threadName):
             print("Username %s unavailable" % username)  
 
     # Send list of connected users to newly initialized user 
-    for name in users:
-        if name == users[len(users-1)]:
-            userlist += name
-        else: userlist += name + ' - '
+    if len(users.keys()) == 0:
+                    userlist = ''
+    else:
+        for name in users:
+            try:
+                if name == users.keys()[len(users)-1]:
+                    userlist += name
+                else: userlist += name + ' - '
+            except Exception as e: 
+                print("-- Userlist Empty -- KeyError with list concatentation")
+                userlist = '[Empty]'
     resp = username + " /$MESSAGE_BREAK: " + userlist
     serverSock.sendto(
         resp.encode('ascii'), 
@@ -87,12 +94,13 @@ def init_user(clientAddr, clientData, threadName):
     print("New User %s Initialized!" % username)
 
 def handle_user(clientAddr, clientData, threadName):
-    print(threadName + ": Message Recieved from " + IP[clientAddr] + " at " + clientAddr  + " requesting username " + clientData )
+    print(threadName + ": Message Recieved from " + str(IPs[clientAddr]) + " at " + str(clientAddr)  + " requesting username " + clientData.decode('utf-8') )
     
     # Client UDP Data must be delimited to determine message receiver 
-    rcv_user, user_msg = clientData.split(" /$MESSAGE_BREAK: ")[0], clientData.split(" /$MESSAGE_BREAK: ")[1]
+    rcv_user, user_msg = clientData.decode('utf-8').split(" /$MESSAGE_BREAK: ")[0], clientData.split(" /$MESSAGE_BREAK: ")[1]
     try: 
-        # ! Add error handling for user not found
+        # ! Add error handling for user not found and user is self
+        
         message = "From " + IPs[clientAddr] + ': ' + user_msg      
         rcv_addr, rcv_port =  users[rcv_user]         
         print("User %s messaging %s at %s:%d .." % str(users[clientAddr]), rcv_user , rcv_addr, rcv_port)
@@ -111,11 +119,32 @@ def main_loop():
     
     while True:    
         clientData, clientAddr = serverSock.recvfrom(1024)
+        print(clientAddr, clientData)
         # client_ip = "%s:%d" clientAddr.split
         # Check on num threads and thread limit
 
-        # If new user, recieve username and add to user listen
-        if clientAddr in users.values():
+        # Check for empty messages
+        if clientData.decode('utf-8') == "":
+            pass
+        
+        # Check for control messages - # new thread
+        elif clientData.decode('utf-8') == '#./USER':
+            if len(users.keys()) == 0:
+                    userlist = ''
+            else:
+                for name in users:
+                    try:
+                        if name == users.keys()[len(users)-1]:
+                            userlist += name
+                        else: userlist += name + ' - '
+                    except Exception as e: 
+                        print("-- Userlist Empty -- KeyError with list concatentation")
+                        userlist = '[Empty]'
+            resp = '#./USER /$MESSAGE_BREAK: %s' % userlist
+            serverSock.sendto(resp.encode, (clientAddr, clientData))
+        
+        # If new user, recieve username and add to user listen else send user's message
+        elif clientAddr in users.values():
             # Handle message for known user
             s = ServerThread(threadCount, "Thread-%d" % threadCount, threadCount, 
                 clientAddr, clientData, newUser=False)
