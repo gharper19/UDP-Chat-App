@@ -37,7 +37,7 @@ def run_client(name, clientSocket): # <--- clientSocket not neccessary , use glo
         print("Error Sending Client Message")
         raise e
 
-# Create Client Socket with SOCK_DGRAM to indicate use of UDP rather than Bytestream 
+# Create GLOBAL Client Socket with SOCK_DGRAM to indicate use of UDP rather than Bytestream 
 clientSock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
 # Prepare request with Server Socket's Port and IP 

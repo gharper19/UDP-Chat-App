@@ -23,7 +23,7 @@ class myThread (threading.Thread):
             print("Error sending to client in %s at %s: %s " % (self.name, self.clientAddr, e))
         
 
-# Create Server Socket with SOCK_DGRAM to indicate use of UDP rather than Bytestream 
+# Create GLOBAL Server Socket with SOCK_DGRAM to indicate use of UDP rather than Bytestream 
 serverSock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
 # Assign hostname and port number, then bind to server socket

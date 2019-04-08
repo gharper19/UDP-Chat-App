@@ -1,0 +1,10 @@
+
+## Basic Goals
+- 2+ clients one server
+- TLS Encryption
+- FTP transfers
+- Group Chat and Server Broadcasting
+  - Users can vote on revoking broadcast privelages
+
+## Extra Stuff
+- Allow Clients to Access server from Android App 

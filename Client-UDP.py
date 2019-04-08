@@ -1,22 +1,21 @@
 import time
 import socket
 import sys
-
+import random
 import threading
 import socket
 
 exitFlag = 0
 class ClientThread (threading.Thread):
-    def __init__(self, threadID, name, counter, sendmsg=False, reqUsers=False):
+    def __init__(self, threadID, name, counter, listenSocket):
         threading.Thread.__init__(self)
         self.threadID = threadID
         self.name = name
         self.counter = counter
-        self.sendmsg = sendmsg
-        self.reqUsers = reqUsers
+        self.listenSocket = listenSocket
     def run(self):
-        if reqUsers:
-            wait_for_resp(user=True)
+        print("Starting %s" % self.name)
+        wait_for_response(self.listenSocket)
 
 '''
 
@@ -33,7 +32,14 @@ thread2.start()
 
 ################## Client Code ####################
 
+
+msg_break = " /$MESSAGE_BREAK: "
+stayOnServer = True
+resp_wait= 1
+
 name = ''
+inbox=[]
+ctrl_inbox = []
 
 def init_client():
     # Init and bind client socket
@@ -52,16 +58,14 @@ def init_client():
 
     # Initialize Client as active with server
     print("trying to connect to Server at ", host , ":", port)
-    # time.sleep(1)
-    
     clientSock.sendto(name.encode("ascii"), server)
 
     # Wait for userId and user list, then parse
     msg = clientSock.recvfrom(1026)[0]
-    msg.decode('utf-8')
-    try: 
-        
-        userName, userlist = msg.split(" /$MESSAGE_BREAK: ")
+    msg = msg.decode('utf-8')
+   
+    try:   
+        name, userlist = msg.split(msg_break)
         print("connected..")
         print(userlist)
     except Exception as e: 
@@ -70,41 +74,81 @@ def init_client():
     return clientSock, server
 
 
-def wait_for_resp(user=False):
-    # ! decode msgs into utf-8 ? and use bytes() ?
-    # try catch with limit on server responses
+def wait_for_response(listenSocket):
+    # Wait for messages from server     -    Issues with passing socket?
+    global stayOnServer
     while stayOnServer:
-        msg = clientSock.recvfrom(1026)[0]
-        inbox += [msg] # include 2nd inbox to keep track of new messages
-        
-        # Check for control messages
-        print(inbox)
+        try:
+            data = listenSocket.recvfrom(1026)[0].decode('utf-8')
+            prefix, msg = clientData.split(msg_break)
+            if "#./USER" in prefix:
+                ctrl_inbox += [data]
+            elif "#./EXIT" in prefix:
+                stayOnServer = False
+                # Close thread
+            else: 
+                inbox += [data]
+                print(inbox)        # Issue printing while taking input
+            
+        except Exception as e:
+            print("Error receiving messages from server %s: %s" % str(server) , e) 
+
+def reqUserList():
+    # Request User List with appended random number to determine most recent
+    userlist=''
+    check, check_inbox_limit= 0, 7
+    print("Requesting updated user list ...")
+    
+    update_key = random.randint(1000, 9999)
+    req = "#./USER" + msg_break + str(update_key)
+    prefix ="#./USER" + str(update_key)
+    try:
+        clientSock.sendto(req.encode("ascii"), server)
+    except Exception as e:
+        print("Error requesting User list: %s")
+
+    # Give receiver thread time to add to control inbox and check for response
+    while check <= check_inbox_limit:
+        time.sleep(resp_wait)
+        for msg in ctrl_inbox:
+            msg_prefix, userdata = msg.split(msg_break)
+            if msg_prefix == prefix:
+                return userdata
+        if check == check_inbox_limit and userlist == '':
+            return "Updated Userlist not found in inbox after waiting %d seconds %d" % (resp_wait, check_inbox_limit)
+        check +=1  
 
 
 def main_loop():
-    # Gets users name, initiates socket , and gets username and userlist from server    
-    socket, server = init_client()
+# Start thread to listen for server messages while also waiting for user input
+    global stayOnServer
+    listening_thread = ClientThread(threadID=1, name="Listening Thread", counter=1, listenSocket=clientSock)
 
-    # Get user's destination and message data
     setDest = True
+    debug_flag=1
     while stayOnServer: 
-        if setDest:
-            msg = input("Enter ./user to Select a user to message and ./exit to leave chat server. Enter ./inbox to view your message inbox.")
-            setDest= False
-        elif not setDest:
-            msg = input("Enter your message for " + dest + ". Enter ./user to change user and ./exit to leave chat server. Enter ./inbox to view your message inbox.")
-        # Check for control commands
+        ## Closed for debugging
+        # if setDest:
+        #     msg = input("Enter ./user to Select a user to message and ./exit to leave chat server. Enter ./inbox to view your message inbox.").strip()
+        #     setDest= False
+        # else:
+        #     msg = input("Enter your message for " + dest + ". Enter ./user to change user and ./exit to leave chat server. Enter ./inbox to view your message inbox.").strip()
+        # # Check for control commands
+        if debug_flag:
+            msg = './user'
+            debug_flag= 0
+        else: 
+            return
+
         if msg == './user':
-            print("Getting user list ...")
-            clientSock.sendto("#./USER".encode("ascii"), server)
-            print(inbox) # Check last 3 msgs in inbox for USER ctrl response
-            # ! Add check for user here or in Server 
-            dest = input("Enter the name of the user you want to message.").split()
+            # Get and print user list
+            userlist = reqUserList()
+            print(userlist)
+
+            ## Include list of delimited clients as option for group messagse 
+            dest = input("Enter the name of the user you want to message.").strip() # or is it split() ?
             print("Currently messaging %s" % dest)
         
-        elif msg == './exit': 
-            stayOnServer = False
-            
         elif msg == './inbox': 
             print(inbox)
             '''
@@ -113,22 +157,21 @@ def main_loop():
             print(rcvMsg)
             break
             '''
+        elif msg == './exit': 
+            stayOnServer = False
+            
         else: 
             if dest == name:
                 print("Error, you entered your name as the recieving user")
                 pass
             else:
-                # Send message -  Will eventually need user input to determine if currently wanting to send or check for recieved messages(inbox) 
-                pkt = dest + ' /$MESSAGE_BREAK: ' + msg
+                # Send user's message with destination user as message prefix 
+                pkt = dest + msg_break + msg
                 s.send(pkt.encode('ascii'), server)
                 print("Sent!")
 
-            '''
-            # recieve messages from server
-            print("Waiting on response ...")
-            rcvMsg = s.recv(1024).decode()
-            print(rcvMsg)
-            '''
+        # If issue with recv in both running threads just have seperate inbox for control and init msgs
+
 
     print("GoodBye!")
 
@@ -136,7 +179,14 @@ def main_loop():
     input("Enter to close")
 
 
-stayOnServer = True
-inbox=[]
-
+# Gets users name, initiates socket , and gets username and userlist from server    
+clientSock, server = init_client()
 main_loop()
+
+# TODO: 
+# Include user input for ports, server, name
+# send server exit message to close the connection and remove user from active users list
+   # -- Since client is always listening, can server just send out userlist when new user joins?
+# see if printing incoming msgs while waiting on input is possible with
+# After that: 
+  # Allow users to select multiple destinations
