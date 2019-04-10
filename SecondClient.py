@@ -65,7 +65,7 @@ ctrl_inbox = []
 def init_client():
     # Init and bind client socket
     clientHost = '127.0.0.1'
-    clientPort = 9998
+    clientPort = 9994
     clientSock =socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     clientSock.bind((clientHost, clientPort)) 
     
@@ -75,7 +75,7 @@ def init_client():
     server = (host,port)
 
     # Get username
-    name = "SnoopDogg"
+    name = "TheRealSnoopDogg"
 
     # Initialize Client as active with server
     print("Connecting to UDP Chat Server at %s:%d ..." % ( host, port) )

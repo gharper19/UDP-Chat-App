@@ -75,16 +75,16 @@ def init_user(clientAddr, clientData, threadName):
     print("[INFO] [INIT_USER] %s: New client %s:%d assigned username: %s" % (threadName, clientAddr[0], clientAddr[1], username) ) 
 
 def handle_user(clientAddr, clientData, threadName):
-    print(threadName + ": Message Recieved from " + str(IPs[clientAddr]) + " at " + str(clientAddr)  + " requesting username " + clientData.decode('utf-8') )
+    print("[INFO] [SND_MSG] %s: Message Received from %s:%d - %s" % (threadName, clientAddr[0], clientAddr[1], clientData.decode('utf-8') ))
     
-    # Client UDP Data must be delimited to determine message receiver 
-    rcv_user, user_msg = clientData.decode('utf-8').split(msg_break)[0], clientData.split(msg_break)[1]
+    # Separate Client UDP Data into rcv user and actual message data 
+    rcv_user, user_msg = clientData.decode('utf-8').split(msg_break)[0], clientData.decode('utf-8').split(msg_break)[1]
     try: 
         # ! Add error handling for user not found and user is self
         message = "From " + IPs[clientAddr] + ': ' + user_msg      
         rcv_addr, rcv_port =  users[rcv_user]         
-        print("User %s messaging %s at %s:%d .." % str(users[clientAddr]), rcv_user , rcv_addr, rcv_port)
-        serverSock.sendto(message.encode, (rcv_addr, rcv_port))
+        print("[INFO] [SND_MSG] User %s messaging %s at %s:%d .." % (IPs[clientAddr], rcv_user , rcv_addr, rcv_port))
+        serverSock.sendto(message.encode('ascii'), (rcv_addr, rcv_port))
     except Exception as e: 
         print("Error Handling User Messaging: " + str(e))
 
