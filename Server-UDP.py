@@ -52,18 +52,17 @@ serverSock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 serverHost = '127.0.0.1' # socket.gethostbyname(socket.gethostname()) #
 serverPort = 9997
 serverSock.bind((serverHost, serverPort))
+bufferSize = 1024
         
 def init_user(clientAddr, clientData, threadName):
 # Add client to lists and send back username and IP address
-    clientData = clientData.decode('utf-8')
-    print("[INFO] [INIT_USER] %s: Initiating client %s:%d requesting username: %s" % (threadName, clientAddr[0], clientAddr[1], clientData) )
-    
-    # Add client to user list using given user name + 4 random digits
+
     reroll = True
     while reroll:
+        # Add client to user list using given user name + 4 random digits
         username = clientData + str(random.randint(1000, 9999))
         if not username in users.keys():
-            # If name not taken record name and IP 
+            # If name not taken record name and IP, continue
             users[username] = clientAddr
             IPs[clientAddr] = username
             reroll= False
@@ -73,7 +72,7 @@ def init_user(clientAddr, clientData, threadName):
     # Send server screen name with appended list of connected users to newly initialized user 
     resp = username + msg_break + getUserList(username)
     serverSock.sendto(resp.encode("ascii"), clientAddr)
-    print("New User %s Initialized!" % username)
+    print("[INFO] [INIT_USER] %s: New client %s:%d assigned username: %s" % (threadName, clientAddr[0], clientAddr[1], username) ) 
 
 def handle_user(clientAddr, clientData, threadName):
     print(threadName + ": Message Recieved from " + str(IPs[clientAddr]) + " at " + str(clientAddr)  + " requesting username " + clientData.decode('utf-8') )
@@ -124,13 +123,9 @@ def sendUserList(clientAddr, clientData):
     # return userlist with user control commad
     resp = msg_prefix + msg_break + userlist
     try:
-        ## Server sits here waiting, initial send exchange of name and userlist passes, 
-        #   but Client wont recieve 
-        print("sending client user list")
-        serverSock.sendto(resp.encode('ascii'), clientAddr)     
-        print("userlist sent")       
+        serverSock.sendto(resp.encode('ascii'), clientAddr)            
     except Exception as e:
-        print("Error Sending user list: %s" % e)
+        print("[ERROR] [SEND_USERLIST] Error Sending user list: %s" % e)
 
 # ! strip() strings on user input
 def main_loop():
@@ -141,42 +136,57 @@ def main_loop():
     while True:   # use thread limit here
         msg_prefix, clientMsg = '', ''
         try:
-            bufferSize = 1024
             clientData, clientAddr = serverSock.recvfrom(bufferSize)
-            
-            # Debugging message
-            print("[INFO MAIN] Recieved datagram: %s - From: %s:%d" % (clientData, clientAddr[0], clientAddr[1]))
-            
-            if msg_break in clientData.decode('utf-8'):
-                msg_prefix, clientMsg = clientData.decode('utf-8').split(msg_break)
-            else:
-                msg_prefix = '#./NEW_USER'
-                clientMsg = clientData.decode('utf-8')
         except Exception as e:
             print("[ERROR MAIN] Error receiving client datagram with buffer size %d: %s" % (bufferSize, str(e)))
         
+        # Debugging message
+        print("[INFO MAIN] Recieved datagram: %s - From: %s:%d" % (clientData, clientAddr[0], clientAddr[1]))
+        
+        if msg_break in clientData.decode('utf-8'):
+            msg_prefix, clientMsg = clientData.decode('utf-8').split(msg_break)
+        else:
+            print("Formmatting error with client message: %s" % clientData.decode('utf-8'))
+            msg_prefix = ''
+            clientMsg = ''
+
         # Check for empty messages
         if clientMsg == "":
             break  # For debugging
         # Check for control messages 
+        elif msg_prefix == "#./INIT": 
+        # If new user, start thread recieve username and add to user listen else send user's message
+            s = ServerThread(threadCount, "Thread-%d" % threadCount, threadCount, 
+                clientAddr, clientMsg, newUser=True)
+            threadCount+=1
+            s.start()
         elif msg_prefix == '#./USER':
             s = ServerThread(threadCount, "Thread-%d" % threadCount, threadCount, 
                 clientAddr, clientData, newUser=False, sendUsers=True)
             threadCount+=1
             s.start()
-        # If host IP is in userlist then start thread to send user's message 
+        elif msg_prefix == '#./EXIT':
+            try:
+                print("[INFO] User %s at %s:%d is disconnecting" % (IPs[clientAddr], clientAddr[0], clientAddr[1]))
+                del users[IPs[clientAddr]]
+                del IPs[clientAddr]
+                
+                # Acknowledge disconnect with client
+                pkt ="#./EXIT" + msg_break + '#./CONFIRMED'
+                serverSock.sendto(pkt.encode('ascii'), clientAddr)
+                
+                print("[INFO] Client %s:%d successfully disconnected." % (clientAddr[0], clientAddr[1]))
+            except Exception as e:
+                print("Error: Exiting user not found in userlist: %s" % e)
         elif clientAddr in users.values():
-            # Handle message for known user
+        # If host IP is in userlist then start thread to send user's message 
+
+            # handle user not found and multiple users
             s = ServerThread(threadCount, "Thread-%d" % threadCount, threadCount, 
                 clientAddr, clientData, newUser=False)
             threadCount+=1
             s.start()
-        # If new user, start thread recieve username and add to user listen else send user's message
-        else: 
-            s = ServerThread(threadCount, "Thread-%d" % threadCount, threadCount, 
-                clientAddr, clientData, newUser=True)
-            threadCount+=1
-            s.start()
+        
 
 
 # socket.setdefaulttimeout(timeout) 

@@ -13,21 +13,41 @@ class ClientThread (threading.Thread):
         self.name = name
         self.counter = counter
     def run(self):
-        print("Starting %s" % self.name)
-        wait_for_response()
+        # print("Starting %s" % self.name)
+        
+        global stayOnServer
+        global inbox
+        global ctrl_inbox
 
-'''
+        # Listening loop waiting for messages from the Server  
+        while stayOnServer:
+            try:
+                clientData = clientSock.recvfrom(1026)[0].decode('utf-8')
+                
+                # Acquire thread lock to assure this runs with main thread
+                threadLock.acquire()
 
-# Create new threads
-thread1 = myThread(1, "Thread-1", 1)
-thread2 = myThread(2, "Thread-2", 2)
-
-# Start new Threads
-thread1.start()
-thread2.start()
-
-'''
-
+                # Check for message break
+                if msg_break in clientData:
+                    prefix, data = clientData.split(msg_break)
+                else:
+                    prefix
+                    data = clientData
+                
+                if "#./USER" in prefix:
+                    ctrl_inbox += [clientData]
+                    print("[INFO] CTRL Inbox: " + str(ctrl_inbox))
+                elif "#./EXIT" in prefix:
+                    stayOnServer = False
+                else: 
+                    inbox += [data]
+                    print("[INFO] MSG Inbox: " + str(inbox))        # Issue printing while taking input?
+                
+                # Acquire thread lock to assure this runs with main thread
+                threadLock.release()
+            
+            except Exception as e:
+                print("Error receiving messages from server %s: %s" % (str(server) , e))
 
 ################## Client Code ####################
 
@@ -54,13 +74,14 @@ def init_client():
     server = (host,port)
 
     # Get username
-    name = "client_tester_guy"
+    name = "SnoopDogg"
 
     # Initialize Client as active with server
     print("Connecting to UDP Chat Server at %s:%d ..." % ( host, port) )
     time.sleep(1)
     print("Requesting username %s ... \n" % name)
-    clientSock.sendto(name.encode("ascii"), server)
+    pkt = "#./INIT" + msg_break + name
+    clientSock.sendto(pkt.encode("ascii"), server)
 
     # Wait for userId and user list, then parse
     msg = clientSock.recvfrom(1026)[0]
@@ -75,29 +96,9 @@ def init_client():
         raise e
     return clientSock, server
 
-
-def wait_for_response():
-    # Wait for messages from server
-    global stayOnServer
-    global inbox
-    global ctrl_inbox
-    while stayOnServer:
-        try:
-            data = clientSock.recvfrom(1026)[0].decode('utf-8')
-            prefix, data = clientData.split(msg_break)
-            if "#./USER" in prefix:
-                ctrl_inbox += [data]
-            elif "#./EXIT" in prefix:
-                stayOnServer = False
-            else: 
-                inbox += [data]
-                print(inbox)        # Issue printing while taking input
-            
-        except Exception as e:
-            print("Error receiving messages from server %s: %s" % (str(server) , e))
-
 def reqUserList():
     global inbox
+    
     # Request User List with appended random number to determine most recent
     userlist=''
     check, check_inbox_limit= 0, 7
@@ -120,11 +121,10 @@ def reqUserList():
                 return userdata
         if check == check_inbox_limit and userlist == '':
             return "Updated Userlist not found in inbox after waiting %d seconds for %d iterations" % (resp_wait, check_inbox_limit)
+        # if check < 2:
+        #     input("Continue? Press Enter")
         check +=1  
-        if check < 2:
-            input("Continue? Press Enter")
         print("Inbox check %d: %s" % (check, ctrl_inbox))
-
 
 def main_loop():
 # Start thread to listen for server messages while also waiting for user input
@@ -137,76 +137,117 @@ def main_loop():
     setDest = True
     debug_flag=1
     while stayOnServer: 
-        # 
-        # if setDest:
-        #     notValid = True
-        #     while notValid: 
-        #         print("Enter the name of the user you want to message. Enter none to pick later.")
-        #         dest = input()#.strip() # or is it split() ?
-        #         notValid = False
-        #         if dest == './user' or dest == '':
-        #             print('Invalid username, please select a user from the active users list.')
-        #             notValid = True
-        #         elif dest == 'none':
-        #             print("No user selected. Enter ./user to select a user to message.")
-        #     setDest= False
-
-        # else:
-        #     msg = input("Enter your message for " + dest + ". Enter ./user to change user and ./exit to leave chat server. Enter ./inbox to view your message inbox.").strip()
-        # # Check for control commands
-        
-        if debug_flag == 1:
-            msg = './user'
-            debug_flag += 1
-        elif debug_flag == 2:
-            time.sleep(1)
-            msg = './inbox'
-        elif debug_flag > 5: 
-            # End early
-            return
-
-        if msg == './user':
-            # Get and print user list
-            userlist = reqUserList()
-            print(userlist)
-
-            ## Include list of delimited clients as option for group messages 
+        # Check if this is first loop iteration
+        if setDest:
+        ## Include list of delimited clients as raw_input option for group messages 
+            
             notValid = True
+            # print("# %s #\n"%userlist)
             while notValid: 
-                dest = input("Enter the name of the user you want to message. Enter none to pick later.\n").strip() # or is it split() ?
+                dest = ''
+                print("Enter the name of the user you want to message. Enter none to pick later.")
+                try:    
+                    dest = raw_input().strip()
+                except Exception as e:
+                    dest = input()
                 notValid = False
                 if dest == './user' or dest == '':
                     print('Invalid username, please select a user from the active users list.')
                     notValid = True
-                elif 'none':
+                elif dest =='none':
                     print("No user selected. Enter ./user to select a user to message.")
-                    dest = " no one"
+                    dest = "no one"
+            print("Currently messaging %s" % dest)
+            setDest= False
+
+
+
+
+        if not setDest:
+            print("\nEnter your message for " + dest 
+                + ". Enter ./user to change user and ./exit to leave chat server. Enter ./inbox to view your message inbox.")
+            try:    
+                msg = raw_input().strip()
+            except Exception as e:
+                msg = input()
+        
+        # if debug_flag == 1:
+        #     msg = './user'
+        #     debug_flag += 1
+        # elif debug_flag == 2:
+        #     time.sleep(1)
+        #     msg = './inbox'
+        # elif debug_flag > 5: 
+        #     # End early
+        #     return
+
+        # Check for control commands
+        if msg == './user':
+        # If user is requesting user list then send request and get destination input 
+            userlist = reqUserList()
+            print("# %s #\n"%userlist)
+
+            ## Include list of delimited clients as raw_input option for group messages 
+            notValid = True
+            while notValid: 
+                dest = ''
+                print("Enter the name of the user you want to message. Enter none to pick later.")
+                try:    
+                    dest = raw_input().strip()
+                except Exception as e:
+                    dest = input()
+                notValid = False
+                if dest == './user' or dest == '':
+                    print('Invalid username, please select a user from the active users list.')
+                    notValid = True
+                elif dest =='none':
+                    print("No user selected. Enter ./user to select a user to message.")
+                    dest = "no one"
             print("Currently messaging %s" % dest)
         
         elif msg == './inbox': 
-            print(inbox)
-            '''
-            print("Waiting on response ...")
-            rcvMsg = s.recv(1024).decode()
-            print(rcvMsg)
-            break
-            '''
+            print("Chat Message Inbox:\n")
+            if len(inbox) == 0: print("No new messages received.")
+            
         elif msg == './exit': 
             stayOnServer = False
-            
+            pkt = "#./EXIT" + msg_break + " #./CONFIRM" 
+            print("\nDisconnecting from server ...")
+            clientSock.sendto(pkt.encode('ascii'), server)
+
         else: 
+        # If no control messages, then send message to preset destination user
             if dest == name:
                 print("Error, you entered your name as the recieving user")
                 pass
+            elif dest == 'no one':
+                print("Error - You have yet to select a user to message. Enter ./user to select a receiving user from the user list.")
             else:
-                # Send user's message with destination user as message prefix 
-                pkt = dest + msg_break + msg
-                s.send(pkt.encode('ascii'), server)
-                print("Sent!")
+                # Confirm send
+                print("Send message: '%s' to %s? (y/n)" % (msg, dest) )
+                try:    
+                    confirm = raw_input().strip()
+                except Exception as e:
+                    confirm = input()
+                if confirm == 'n' or confirm == 'no':
+                    pass
+                else:
+                # Send user's message with destination user as message prefix
+                    pkt = dest + msg_break + msg
+                    try:
+                        clientSock.sendto(pkt.encode('ascii'), server)
+                    except Exception as e: 
+                        print("Error sending client msg '%s' to server: %s" % (msg, e) )
+                    print("Message sent!")
 
-    print("GoodBye!")
-    input("Press Enter to Close ")
-    
+    print("GoodBye!\nPress Enter to Close.")
+    try:    
+        raw_input().strip()
+    except Exception as e:
+        input()
+# Create thread lock to sync threads
+threadLock = threading.Lock()
+
 # Gets users name, initiates socket , and gets username and userlist from server    
 clientSock, server = init_client()
 main_loop()
@@ -215,6 +256,14 @@ main_loop()
 
 # IF ALL ELSE FAILS: Just send back and forth and put inbox on server
 ## Right now im going to put main loop in seperate thread and have main thread rcv 
+# Notes: No problem with printing while waiting on input
+
+### New soln: use locks to keep threads synced and thread.join() to only close once they are all finished
+## - Check if I can just run synced sending and recieving threads on same port 
+### User input soln: input takes in you input as an evaluated expression, raw_input gets just the string
+#### IDEA: Lock all thread functions not using socket or just test whether locked threads can use same socket
+#### RECALL: You're running py3 in terminal, but py2 by default. each will throw an error on other's input. 
+# Keep in mind when making exe - quick fix with try/catch
 
 # TODO: 
 # Include user input for ports, server, name
