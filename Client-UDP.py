@@ -7,15 +7,14 @@ import socket
 
 exitFlag = 0
 class ClientThread (threading.Thread):
-    def __init__(self, threadID, name, counter, listenSocket):
+    def __init__(self, threadID, name, counter):
         threading.Thread.__init__(self)
         self.threadID = threadID
         self.name = name
         self.counter = counter
-        self.listenSocket = listenSocket
     def run(self):
         print("Starting %s" % self.name)
-        wait_for_response(self.listenSocket)
+        wait_for_response()
 
 '''
 
@@ -60,16 +59,13 @@ def init_client():
     # Initialize Client as active with server
     print("Connecting to UDP Chat Server at %s:%d ..." % ( host, port) )
     time.sleep(1)
-    print("Requesting username %s ..." % name)
+    print("Requesting username %s ... \n" % name)
     clientSock.sendto(name.encode("ascii"), server)
 
     # Wait for userId and user list, then parse
     msg = clientSock.recvfrom(1026)[0]
     msg = msg.decode('utf-8')
    
-    ## Debugging
-    print("[INFO INIT] First Server Response: %s" % str(msg))
-
     try:   
         name, userlist = msg.split(msg_break)
         print("Connected to Chat Server. Your screen name is %s" % name)
@@ -80,28 +76,25 @@ def init_client():
     return clientSock, server
 
 
-def wait_for_response(listenSocket):
-    # Wait for messages from server    -    Issues with passing socket?
+def wait_for_response():
+    # Wait for messages from server
     global stayOnServer
     global inbox
     global ctrl_inbox
     while stayOnServer:
         try:
-            data = listenSocket.recvfrom(1026)[0].decode('utf-8')
-            prefix, msg = clientData.split(msg_break)
+            data = clientSock.recvfrom(1026)[0].decode('utf-8')
+            prefix, data = clientData.split(msg_break)
             if "#./USER" in prefix:
                 ctrl_inbox += [data]
             elif "#./EXIT" in prefix:
                 stayOnServer = False
-                
-                # Close thread
-            
             else: 
                 inbox += [data]
                 print(inbox)        # Issue printing while taking input
             
         except Exception as e:
-            print("Error receiving messages from server %s: %s" % str(server) , e) 
+            print("Error receiving messages from server %s: %s" % (str(server) , e))
 
 def reqUserList():
     global inbox
@@ -128,41 +121,48 @@ def reqUserList():
         if check == check_inbox_limit and userlist == '':
             return "Updated Userlist not found in inbox after waiting %d seconds for %d iterations" % (resp_wait, check_inbox_limit)
         check +=1  
-
         if check < 2:
             input("Continue? Press Enter")
-        print("Inbox check %d: %s" % (check, inbox))
+        print("Inbox check %d: %s" % (check, ctrl_inbox))
 
 
 def main_loop():
 # Start thread to listen for server messages while also waiting for user input
+    listening_thread = ClientThread(threadID=1, name="Listening Thread", counter=1)
+    listening_thread.start()
+
     global stayOnServer
-    listening_thread = ClientThread(threadID=1, name="Listening Thread", counter=1, listenSocket=clientSock)
+    global inbox
 
     setDest = True
     debug_flag=1
     while stayOnServer: 
-        ## Closed for debugging
-        if setDest:
-            notValid = True
-            while notValid: 
-                dest = input("Enter the name of the user you want to message. Enter none to pick later.").strip() # or is it split() ?
-                notValid = False
-                if dest == './user' or dest == '':
-                    print('Invalid username, please select a user from the active users list.')
-                    notValid = True
-                elif 'none':
-                    print("No user selected. Enter ./user to select a user to message.")
-            setDest= False
+        # 
+        # if setDest:
+        #     notValid = True
+        #     while notValid: 
+        #         print("Enter the name of the user you want to message. Enter none to pick later.")
+        #         dest = input()#.strip() # or is it split() ?
+        #         notValid = False
+        #         if dest == './user' or dest == '':
+        #             print('Invalid username, please select a user from the active users list.')
+        #             notValid = True
+        #         elif dest == 'none':
+        #             print("No user selected. Enter ./user to select a user to message.")
+        #     setDest= False
 
         # else:
         #     msg = input("Enter your message for " + dest + ". Enter ./user to change user and ./exit to leave chat server. Enter ./inbox to view your message inbox.").strip()
         # # Check for control commands
         
-        if debug_flag:
+        if debug_flag == 1:
             msg = './user'
-            debug_flag= 0
-        else: 
+            debug_flag += 1
+        elif debug_flag == 2:
+            time.sleep(1)
+            msg = './inbox'
+        elif debug_flag > 5: 
+            # End early
             return
 
         if msg == './user':
@@ -172,16 +172,15 @@ def main_loop():
 
             ## Include list of delimited clients as option for group messages 
             notValid = True
-            dest = ''
             while notValid: 
-                dest = input("Enter the name of the user you want to message. Enter none to pick later.").strip() # or is it split() ?
+                dest = input("Enter the name of the user you want to message. Enter none to pick later.\n").strip() # or is it split() ?
                 notValid = False
                 if dest == './user' or dest == '':
                     print('Invalid username, please select a user from the active users list.')
                     notValid = True
                 elif 'none':
                     print("No user selected. Enter ./user to select a user to message.")
-                    dest = "no one"
+                    dest = " no one"
             print("Currently messaging %s" % dest)
         
         elif msg == './inbox': 
@@ -207,13 +206,10 @@ def main_loop():
 
     print("GoodBye!")
     input("Press Enter to Close ")
-
-try:
-    # Gets users name, initiates socket , and gets username and userlist from server    
-    clientSock, server = init_client()
-    main_loop()
-except Exception as e: 
-    input("CLIENT FAILURE: %s\nePress Enter to Exit" % e)
+    
+# Gets users name, initiates socket , and gets username and userlist from server    
+clientSock, server = init_client()
+main_loop()
 
 # rcvs name and list, user ctrl gives error
 
