@@ -37,7 +37,6 @@ thread2.start()
 ################## Server Code ####################
 
 
-
 # Debugging 
 thread_limit = 99
 
@@ -53,12 +52,11 @@ serverSock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 serverHost = '127.0.0.1' # socket.gethostbyname(socket.gethostname()) #
 serverPort = 9997
 serverSock.bind((serverHost, serverPort))
-print("Server Initialized at %s" % serverSock)
         
 def init_user(clientAddr, clientData, threadName):
 # Add client to lists and send back username and IP address
     clientData = clientData.decode('utf-8')
-    print(threadName + ": Connection Recieved from " + clientAddr[0] + str(clientAddr[1]) + " requesting username " + clientData)
+    print("[INFO] [INIT_USER] %s: Initiating client %s:%d requesting username: %s" % (threadName, clientAddr[0], clientAddr[1], clientData) )
     
     # Add client to user list using given user name + 4 random digits
     reroll = True
@@ -73,7 +71,7 @@ def init_user(clientAddr, clientData, threadName):
             print("Username %s unavailable" % username)  
 
     # Send server screen name with appended list of connected users to newly initialized user 
-    resp = username + msg_break + getUserList()
+    resp = username + msg_break + getUserList(username)
     serverSock.sendto(resp.encode("ascii"), clientAddr)
     print("New User %s Initialized!" % username)
 
@@ -94,31 +92,49 @@ def handle_user(clientAddr, clientData, threadName):
     # Send message to receiving IP address and port
     print("Message Sent!"); 
 
-def getUserList():
-    if len(users.keys()) == 0:
+def getUserList(clientName = ''):
+    userlist = 'Active Users: '
+    usernames = list(users.keys())
+    if len(usernames) == 0:
         userlist = 'You are the first to connect to the server!'
     else:
-        for name in users:
+        for name in usernames:
             try:
-                if name == users.keys()[len(users)-1]:
-                    userlist += name
-                else: userlist += name + ' - '
+                if name == usernames[len(users)-1]:
+                    if name == clientName:
+                        userlist += name + "(you)"
+                    else:
+                        userlist += name
+                else: 
+                    if name == clientName:
+                        userlist += name + "(you)" + ' - '
+                    else:
+                        userlist += name + ' - '
+                # print("[INFO] userlist successfully retrieved in getUserList")
             except Exception as e: 
-                print("[INFO] -- Userlist Empty -- KeyError with list concatentation")
+                print("[ERROR] -- Userlist Empty -- KeyError with list concatentation in getUserList")
                 userlist = '[Empty]'
     return userlist
 
 def sendUserList(clientAddr, clientData):
-    userlist = getUserList()
+    clientData = clientData.decode("utf-8")
+    userlist = getUserList(IPs[clientAddr])
     msg_prefix = clientData.split(msg_break)[0] + clientData.split(msg_break)[1]
+    
     # return userlist with user control commad
     resp = msg_prefix + msg_break + userlist
-    serverSock.sendto(resp.encode('ascii'), (clientAddr, clientData))            
-
+    try:
+        ## Server sits here waiting, initial send exchange of name and userlist passes, 
+        #   but Client wont recieve 
+        print("sending client user list")
+        serverSock.sendto(resp.encode('ascii'), clientAddr)     
+        print("userlist sent")       
+    except Exception as e:
+        print("Error Sending user list: %s" % e)
 
 # ! strip() strings on user input
 def main_loop():
-    print("Server Online ... Waiting for connections: \n")
+    print("Server Online at %s:%s... Waiting for connections: \n" % (serverHost, serverPort) )
     threadCount = 1
     
     # Keep Server Process running prepared for clients - start a new thread for each client
@@ -127,15 +143,20 @@ def main_loop():
         try:
             bufferSize = 1024
             clientData, clientAddr = serverSock.recvfrom(bufferSize)
-            msg_prefix, clientMsg = clientData.decode('utf-8').split(msg_prefix)
+            
+            # Debugging message
+            print("[INFO MAIN] Recieved datagram: %s - From: %s:%d" % (clientData, clientAddr[0], clientAddr[1]))
+            
+            if msg_break in clientData.decode('utf-8'):
+                msg_prefix, clientMsg = clientData.decode('utf-8').split(msg_break)
+            else:
+                msg_prefix = '#./NEW_USER'
+                clientMsg = clientData.decode('utf-8')
         except Exception as e:
-            print("Error recieving with buffer size %d" % bufferSize)
+            print("[ERROR MAIN] Error receiving client datagram with buffer size %d: %s" % (bufferSize, str(e)))
         
-        ## Debugging
-        print(clientAddr, clientData)
-
         # Check for empty messages
-        if clientData.decode('utf-8') == "":
+        if clientMsg == "":
             break  # For debugging
         # Check for control messages 
         elif msg_prefix == '#./USER':
@@ -162,4 +183,12 @@ def main_loop():
 
 # def if __name__ == "__main__":
 #     pass
-main_loop()
+try:
+    main_loop()
+except Exception as e: 
+    input("Server FAILURE: %s\nPress Enter to Exit" % e)
+
+# TODO: 
+
+# BUGS:
+# - Check on getUserList() dictionary key error  
