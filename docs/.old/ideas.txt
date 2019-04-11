@@ -1,10 +1,25 @@
 
 ## Basic Goals
+- get user input: client host(automatic) and port, server host, name, 
 - 2+ clients one server
-- TLS Encryption
-- FTP transfers
 - Group Chat and Server Broadcasting
-  - Users can vote on revoking broadcast privelages
+- TLS Encryption
 
-## Extra Stuff
-- Allow Clients to Access server from Android App 
+## EXTRA stuff:
+- Server timeout for user activity(disconnect) and inactive server (shutdown) conditions
+- inbox: show to <- vs. outbox ->
+	- add option for ctrl_inbox
+
+--
+
+## BUGS
+- Included try/catch in all user inputs for conflicting python versions
+- Check on getUserList() dictionary key error  
+
+## Issues: 
+- does it run better with __init__ == __main__ 
+
+--
+
+## Notes: 
+- recvfrom works with same buffer size on both clients
