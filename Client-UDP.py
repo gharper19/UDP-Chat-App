@@ -58,6 +58,7 @@ class ClientThread (threading.Thread):
 
 msg_break = " /$MESSAGE_BREAK: "
 stayOnServer = True
+streamInbox= False
 resp_wait= 1
 
 name = ''
@@ -67,6 +68,7 @@ ctrl_inbox = []
 
 def init_client():
 # Get user data for establishing connection and request username and userlist from server 
+    
     # Init and bind client socket
     clientHost = '127.0.0.1'
     clientPort = 9998
@@ -81,10 +83,15 @@ def init_client():
     # Get username
     name = "SnoopDogg"
 
+
+    # Ask user if they want messages to show on screen or keep default and check with command
+    # Also ask if they want message confirmations
+
+
     # Initialize Client as active with server
     print("Connecting to UDP Chat Server at %s:%d ..." % ( host, port) )
     time.sleep(1)
-    print("Requesting username %s ... \n" % name)
+    print("Requesting username %s ... " % name)
     time.sleep(1)
     pkt = "#./INIT" + msg_break + name
     clientSock.sendto(pkt.encode("ascii"), server)
@@ -94,8 +101,8 @@ def init_client():
         msg = clientSock.recvfrom(1026)[0]
         msg = msg.decode('utf-8')
         name, userlist = msg.split(msg_break)
-        print("Connected to Chat Server. Your screen name is %s" % name)
-        print(userlist)
+        print("Connected to Chat Server. Your screen name is %s\n" % name)
+        print('%s\n' % userlist)
     except Exception as e: 
         print("Error initiating chat client with server." + str(e))
         raise e
@@ -115,7 +122,7 @@ def reqUserList():
     # send request
     try:
         clientSock.sendto(req.encode("ascii"), server)
-        print("Requesting updated user list ...\n")
+        print("\nRequesting updated user list ...")
     except Exception as e:
         print("Error requesting user list: %s" % e)
 
@@ -125,12 +132,12 @@ def reqUserList():
         for msg in ctrl_inbox:
             msg_prefix, userdata = msg.split(msg_break)
             if msg_prefix == prefix:
-                userlist = userdata
+                return userdata
                 break
         if check == check_inbox_limit and userlist == '':
-           print("Updated Userlist not found in inbox after waiting %d seconds for %d iterations : %s" % (resp_wait, check_inbox_limit, userlist))
+           print("[ERROR] Updated Userlist not found in inbox after waiting %d seconds for %d iterations : %s" % (resp_wait, check_inbox_limit, userlist))
         check +=1  
-    
+    return 'Request for userlist has timed out. Userlist unavailable'
 def main_loop():
 # Start thread to listen for server messages while also waiting for user input
     global stayOnServer
@@ -142,7 +149,8 @@ def main_loop():
     listening_thread.start()
     
     # Start user interface loop
-    while stayOnServer:    
+    while stayOnServer:
+        msg = ''    
         if initial_setup:
         # Check if this is first loop iteration, if so get initial destination to initialize destination user before continuing with main loop
             notValid = True
@@ -172,8 +180,10 @@ def main_loop():
                 msg = raw_input().strip()
             except Exception as e:
                 msg = input()
-
-        if msg == './user':
+        
+        if msg == '':
+            pass        
+        elif msg == './user':
         # If user is requesting user list then send request and get new user destination input 
             
             # Request userlist from server and print it
@@ -223,12 +233,11 @@ def main_loop():
                 print("Error - You have yet to select a user to message. Enter ./user to select a receiving user from the user list.")
             else:
                 # Confirm send
-                print("Send message: '%s' to %s? (y/n)" % (msg, dest) )
                 try:    
-                    confirm = raw_input().strip()
+                    confirm = raw_input("Send message: '%s' to %s? (y/n) " % (msg, dest) ).strip()
                 except Exception as e:
-                    confirm = input()
-                if confirm == 'n' or confirm == 'no':
+                    confirm = input("Send message: '%s' to %s? (y/n) " % (msg, dest) )
+                if confirm == 'n' or confirm == 'no' or confirm == 'N':
                     pass
                 else:
                 # Send user's message with destination user as message prefix
@@ -246,18 +255,17 @@ def main_loop():
     except Exception as e:
         input()
 
-interface_timing_wait = 1
-
 # Create thread lock to sync threads
 threadLock = threading.Lock()
 
-# Gets users name, initiates socket , and gets username and userlist from server    
+# initiate client socket and get server data input from user    
 clientSock, server = init_client()
+
+# Initiate main messaging interface loop
 main_loop()
 
-# rcvs name and list, user ctrl gives error
 
-# IF ALL ELSE FAILS: Just send back and forth and put inbox on server
+## IF ALL ELSE FAILS: Just send back and forth and put inbox on server
 ## Right now im going to put main loop in seperate thread and have main thread rcv 
 # Notes: No problem with printing while waiting on input
 

@@ -61,7 +61,7 @@ def init_user(clientAddr, clientData, threadName):
             print("Username %s unavailable" % username)  
 
     # Send server screen name with appended list of connected users to newly initialized user 
-    resp = username + msg_break + getUserList(username)
+    resp = username + msg_break + compileUserList(username)
     serverSock.sendto(resp.encode("ascii"), clientAddr)
     print("[INFO] [INIT_USER] %s: New client %s:%d assigned username: %s" % (threadName, clientAddr[0], clientAddr[1], username) ) 
 
@@ -91,11 +91,7 @@ def handle_user(clientAddr, clientData, threadName):
         print("[ERROR] [SND_MSG] Error sending user message '%s':%s" 
             % (clientData.decode('utf-8'), str(e) ) )
 
-def sendUserList(clientAddr, clientData):
-# Compile all usernames into a string, mark user with '(you)', and send to requesting user 
-    clientData = clientData.decode("utf-8")
-    clientName = IPs[clientAddr]
-    
+def compileUserList(clientName):
     # Compile User list
     userlist = 'Active Users: '
     usernames = list(users.keys())
@@ -115,9 +111,16 @@ def sendUserList(clientAddr, clientData):
                     else:
                         userlist += name + ' - '
             except Exception as e: 
-                print("[ERROR] -- Userlist Empty -- KeyError with list concatentation in getUserList: " + e)
+                print("[ERROR] [compileUserList] -- Userlist Empty -- KeyError with list concatentation: " + e)
                 userlist = '[Empty]'
+    return userlist
 
+def sendUserList(clientAddr, clientData):
+# Compile all usernames into a string, mark user with '(you)', and send to requesting user 
+    clientData = clientData.decode("utf-8")
+    clientName = IPs[clientAddr]
+    userlist = compileUserList(clientName)
+    
     # Compile Ctrl prefix from Ctrl msg and update code
     msg_prefix = clientData.split(msg_break)[0] + clientData.split(msg_break)[1]
     
