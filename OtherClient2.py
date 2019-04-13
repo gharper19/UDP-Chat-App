@@ -72,7 +72,7 @@ def init_client():
     
     # Init and bind client socket
     clientHost = '127.0.0.1'
-    clientPort = 9998
+    clientPort = 9995
     clientSock =socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     clientSock.bind((clientHost, clientPort)) 
     
@@ -82,7 +82,7 @@ def init_client():
     server = (host,port)
 
     # Get username
-    name = "SnoopDogg"
+    name = "AbSoul-BlackHippy"
 
 
     # Ask user if they want messages to show on screen or keep default and check with command
@@ -144,8 +144,6 @@ def main_loop():
 # Start thread to listen for server messages while also waiting for user input
     global stayOnServer
     global inbox
-    global name
-    
     initial_setup = True
 
     # Start thread to listen for server responses
@@ -193,7 +191,7 @@ def main_loop():
                     
                     # Set group name and add to destination
                     user_groups[groupName] = userstring
-                    dest = userstring
+                    dest = groupName
                 elif dest =='none' or dest =='no one' or dest =='0' or dest == '' or dest == './exit':
                     print("No user selected. Enter ./user to select a user to message.")
                     dest = "no one"
@@ -268,7 +266,7 @@ def main_loop():
             if len(inbox) == 0: print("No new messages received.")
             else:
                 for m in inbox:
-                    print("  %s -> \n")
+                    print(" ->   %s\n" % m)
             
         elif msg == './exit': 
         # Send exit message to server and end main loop

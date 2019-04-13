@@ -72,24 +72,29 @@ def handle_user(clientAddr, clientData, threadName):
     # Separate Client UDP Data into rcv user and actual message data 
     rcv_user, user_msg = clientData.decode('utf-8').split(msg_break)[0],clientData.decode('utf-8').split(msg_break)[1]
     
-    # check if rcv_user is valid, if not respond with error code and exit function
-    if rcv_user == IPs[clientAddr] or rcv_user not in users.keys():
-        resp = "#./ERROR_INVALID_USER" + msg_break + clientData
-        serverSock.sendto(resp.encode('ascii'), clientAddr)
-        print("[ERROR] [SND_MSG] Destination user is invalid. Cannot send message '%s':%s" 
-            % (clientData.decode('utf-8'), str(e) ) )
-        return
-   
-    # Send users message to intended user
-    try: 
-        message = "From " + IPs[clientAddr] + ': ' + user_msg      
-        rcv_addr, rcv_port =  users[rcv_user]         
-        serverSock.sendto(message.encode('ascii'), (rcv_addr, rcv_port))
-        print("[INFO] [SND_MSG] User %s has sent message '%s' to  %s at %s:%d .." 
-            % (IPs[clientAddr], user_msg, rcv_user , rcv_addr, rcv_port)) 
-    except Exception as e: 
-        print("[ERROR] [SND_MSG] Error sending user message '%s':%s" 
-            % (clientData.decode('utf-8'), str(e) ) )
+    if ', ' in rcv_user:
+        rcv_group = rcv_user.split(', ')
+        for username in rcv_group:
+        # Send same message to each user in the list
+            rcv_user = username
+            # check if rcv_user is valid, if not respond with error code and exit function
+            if rcv_user == IPs[clientAddr] or rcv_user not in users.keys():
+                resp = "#./ERROR_INVALID_USER" + msg_break + clientData
+                serverSock.sendto(resp.encode('ascii'), clientAddr)
+                print("[ERROR] [SND_MSG] Destination user is invalid. Cannot send message '%s':%s" 
+                    % (clientData.decode('utf-8'), str(e) ) )
+                return
+        
+            # Send users message to intended user
+            try: 
+                message = "From " + IPs[clientAddr] + ': ' + user_msg      
+                rcv_addr, rcv_port =  users[rcv_user]         
+                serverSock.sendto(message.encode('ascii'), (rcv_addr, rcv_port))
+                print("[INFO] [SND_MSG] User %s has sent message '%s' to  %s at %s:%d .." 
+                    % (IPs[clientAddr], user_msg, rcv_user , rcv_addr, rcv_port)) 
+            except Exception as e: 
+                print("[ERROR] [SND_MSG] Error sending user message '%s':%s" 
+                    % (clientData.decode('utf-8'), str(e) ) )
 
 def compileUserList(clientName):
     # Compile User list

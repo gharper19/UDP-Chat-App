@@ -64,10 +64,12 @@ resp_wait= 1
 name = ''
 inbox=[]
 ctrl_inbox = []
+user_groups = {}
 
 
 def init_client():
 # Get user data for establishing connection and request username and userlist from server 
+    
     # Init and bind client socket
     clientHost = '127.0.0.1'
     clientPort = 9996
@@ -80,8 +82,11 @@ def init_client():
     server = (host,port)
 
     # Get username
-    name = "ThaRealSnoopDogg"
+    name = "TheRealSnoopDogg"
 
+
+    # Ask user if they want messages to show on screen or keep default and check with command
+    # Also ask if they want message confirmations
 
 
     # Initialize Client as active with server
@@ -134,6 +139,7 @@ def reqUserList():
            print("[ERROR] Updated Userlist not found in inbox after waiting %d seconds for %d iterations : %s" % (resp_wait, check_inbox_limit, userlist))
         check +=1  
     return 'Request for userlist has timed out. Userlist unavailable'
+
 def main_loop():
 # Start thread to listen for server messages while also waiting for user input
     global stayOnServer
@@ -152,15 +158,40 @@ def main_loop():
             notValid = True
             while notValid: 
                 dest = ''
-                print("Enter the name of the user you want to message. Enter 'none' or '0' to pick later.")
+                print("Enter the name of the user or group you want to message. Enter 'none' or '0' to pick later.")
+                
+                # Allow user to enter multiple names delimited by commas to create a group message and ask for an identifier for group
+                print("To create a group message, enter the names of the users you would like to message with each seperated by commas.")
+                
                 try:    
                     dest = raw_input().strip()
                 except Exception as e:
                     dest = input()
+
                 notValid = False
                 if dest == './user':
                     print('Invalid username, please select a user from the active users list.')
                     notValid = True
+                elif ',' in dest:
+                    # Check if group message
+                    users = dest.split(',')
+                    userstring = ''
+                    for name in users:
+                        if name == ' ' or name == '':
+                            del name
+                        else:
+                            userstring += name.strip()
+                            if not name == users[len(users)-1]:
+                                userstring += ', '
+                    print("Enter a name for your new message group of users: %s" % userstring)
+                    try:    
+                        groupName = raw_input().strip()
+                    except Exception as e:
+                        groupName = input().strip
+                    
+                    # Set group name and add to destination
+                    user_groups[groupName] = userstring
+                    dest = userstring
                 elif dest =='none' or dest =='no one' or dest =='0' or dest == '' or dest == './exit':
                     print("No user selected. Enter ./user to select a user to message.")
                     dest = "no one"
@@ -169,7 +200,7 @@ def main_loop():
         elif not initial_setup:
         # if this is not the first loop iteration, dest is already initiated, so continue interface loop
             print("\nEnter your message for " + dest 
-                + ". Enter './user' to change user and './inbox' to view your message inbox. \nEnter ./exit to leave chat server .")
+                + ". Enter './user' to change destination user and './inbox' to view your message inbox. \nEnter ./exit to leave chat server .")
             
             # Included try/catch in all user inputs for conflicting python versions
             try:    
@@ -190,7 +221,11 @@ def main_loop():
             notValid = True
             while notValid: 
                 dest = ''
-                print("Enter the name of the user you want to message. Enter none to pick later.")
+                print("Enter the name of the user or group you want to message. Enter none to pick later.")
+                
+                # Allow user to enter multiple names delimited by commas to create a group message and ask for an identifier for group
+                print("To create a group message, enter the names of the users you would like to message with each seperated by commas.")
+                
                 try:    
                     dest = raw_input().strip()
                 except Exception as e:
@@ -200,6 +235,26 @@ def main_loop():
                 if dest == './user' or dest == '':
                     print('Invalid username, please select a user from the active users list.')
                     notValid = True
+                elif ',' in dest:
+                    # Check if group message
+                    users = dest.split(',')
+                    userstring = ''
+                    for name in users:
+                        if name == ' ' or name == '':
+                            del name
+                        else:
+                            userstring += name.strip()
+                            if not name == users[len(users)-1]:
+                                userstring += ', '
+                    print("Enter a name for your new message group of users: %s" % userstring)
+                    try:    
+                        groupName = raw_input().strip()
+                    except Exception as e:
+                        groupName = input().strip
+                    
+                    # Set group name and add to destination
+                    user_groups[groupName] = userstring
+                    dest = groupName
                 elif dest =='none':
                     print("No user selected. Enter ./user to select a user to message.")
                     dest = "no one"
@@ -221,31 +276,33 @@ def main_loop():
             clientSock.sendto(pkt.encode('ascii'), server)
 
         else: 
-        # If no control messages, then send message to preset destination user
-            if dest == name:
+        # If no control messages, then send message for preset destination user to the server
+            send = dest
+            if send in user_groups.keys():
+                send = user_groups[send]
+            if send == name:
                 print("Error, you entered your name as the receiving user")
                 pass
-            elif dest == 'no one':
+            elif send == 'no one':
                 print("Error - You have yet to select a user to message. Enter ./user to select a receiving user from the user list.")
             else:
                 # Confirm send
                 try:    
-                    confirm = raw_input("Send message: '%s' to %s? (y/n) " % (msg, dest) ).strip()
+                    confirm = raw_input("Send message: '%s' to %s? (y/n) " % (msg, send) ).strip()
                 except Exception as e:
-                    confirm = input("Send message: '%s' to %s? (y/n) " % (msg, dest) )
+                    confirm = input("Send message: '%s' to %s? (y/n) " % (msg, send) )
                 if confirm == 'n' or confirm == 'no' or confirm == 'N':
                     pass
                 else:
                 # Send user's message with destination user as message prefix
-                    pkt = dest + msg_break + msg
+                    pkt = send + msg_break + msg
                     try:
                         clientSock.sendto(pkt.encode('ascii'), server)
                     except Exception as e: 
                         print("Error sending client msg '%s' to server: %s" % (msg, e) )
                     print("Message sent.")
-
-    
     print("GoodBye!\nPress Enter to Close.")
+
     try:    
         raw_input().strip()
     except Exception as e:
