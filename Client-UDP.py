@@ -7,6 +7,7 @@ import socket
 
 exitFlag = 0
 class ClientThread (threading.Thread):
+# Listens on global clientSocket for messages from server
     def __init__(self, threadID, name, counter):
         threading.Thread.__init__(self)
         self.threadID = threadID
@@ -17,6 +18,7 @@ class ClientThread (threading.Thread):
         global stayOnServer
         global inbox
         global ctrl_inbox
+        global streamInbox
 
         # Listening loop waiting for messages from the Server  
         while stayOnServer:
@@ -37,7 +39,7 @@ class ClientThread (threading.Thread):
                 # Check message for control responses
                 if "#./USER" in prefix:
                     ctrl_inbox += [clientData]
-                    print("[INFO] CTRL Inbox: " + str(ctrl_inbox))
+                    # print("[INFO] [DEBUG] CTRL Inbox: " + str(ctrl_inbox))
                 elif "#./EXIT" in prefix:
                     stayOnServer = False
                 elif "#./ERROR_INVALID_USER" in prefix:
@@ -47,13 +49,13 @@ class ClientThread (threading.Thread):
                 else: 
                     inbox += [data]
                     time.sleep(2)
-                    print("[INFO] MSG Inbox: " + str(inbox))        
+                    # print("[INFO] [DEBUG] Inbox: " + str(inbox))
+                    if streamInbox:
+                        print("> " + str(data)+ '\n')        
                 
                 threadLock.release()
             except Exception as e:
                 print("Error receiving messages from server %s: %s" % (str(server) , e))
-
-################## Client Code ####################
 
 
 msg_break = " /$MESSAGE_BREAK: "
@@ -69,28 +71,67 @@ user_groups = {}
 
 def init_client():
 # Get user data for establishing connection and request username and userlist from server 
-    
+    global streamInbox
+
     # Init and bind client socket
     clientHost = '127.0.0.1'
     clientPort = 9998
-    clientSock =socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    clientSock.bind((clientHost, clientPort)) 
+    clientSock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     
+    print("Enter the port that the messager client should use. Enter nothing to use default port %d" % clientPort)
+    try:    
+        t = raw_input().strip()
+    except Exception as e:
+        t = input()
+    if not t == '':
+        clientPort= int(t)
+    
+    try:
+        clientSock.bind((clientHost, clientPort)) 
+    except Exception as e: 
+        clientPort = 9998
+        clientSock.bind((clientHost, clientPort)) 
+        print("Error with chosen port. Using default port %d" % clientPort)
+
     # Get Server IP and port
-    host = '127.0.0.1'   #'192.168.56.1'#input(str("Please enter the server address : "))#
+    host = '127.0.0.1' 
     port = 9997
     server = (host,port)
+    print("Enter the port for the chat server.")
+    try:    
+        t = raw_input().strip()
+    except Exception as e:
+        t = input()
+    if not t == '':
+        port= int(t)
 
     # Get username
-    name = "SnoopDogg"
+    name = 'Client'
+    print("Enter your username for the chat server.")
+    try:    
+        t = raw_input().strip()
+    except Exception as e:
+        t = input()
+    if not t == '':
+        name= t
 
 
     # Ask user if they want messages to show on screen or keep default and check with command
-    # Also ask if they want message confirmations
-
-
+    resp = ''
+    print("\nMessages are accessed by the ./inbox control command in the interface by default.\n"
+        + "Would you like for messages to be shown as they are received instead? (y/n)")
+    try:    
+        resp = raw_input().strip()
+    except Exception as e:
+        resp = input()
+    
+    if resp == 'n' or resp == 'no' or resp == 'N' or resp == '':
+        streamInbox = False
+    else:
+        streamInbox = True
+    
     # Initialize Client as active with server
-    print("Connecting to UDP Chat Server at %s:%d ..." % ( host, port) )
+    print("\nConnecting to UDP Chat Server at %s:%d ..." % ( host, port) )
     time.sleep(1)
     print("Requesting username %s ... " % name)
     time.sleep(1)
@@ -145,7 +186,7 @@ def main_loop():
     global stayOnServer
     global inbox
     global name
-    
+
     initial_setup = True
 
     # Start thread to listen for server responses
@@ -160,22 +201,23 @@ def main_loop():
             notValid = True
             while notValid: 
                 dest = ''
-                print("Enter the name of the user or group you want to message. Enter 'none' or '0' to pick later.")
-                
-                # Allow user to enter multiple names delimited by commas to create a group message and ask for an identifier for group
-                print("To create a group message, enter the names of the users you would like to message with each seperated by commas.")
-                
+                # Allow user to enter a single name, or multiple names delimited by commas to create a group message and ask for an identifier for group
+                print("Enter the name of the user or group you want to message."
+                    + "To create a group message, enter the names of the users you would like to message with each seperated by commas.")
+                print("Enter 'none' or '0' to pick your destination user later.")
                 try:    
                     dest = raw_input().strip()
                 except Exception as e:
-                    dest = input()
-
+                    dest = input().strip()
+                
+                # Assume user input is valid and proceed with checks
                 notValid = False
                 if dest == './user':
+                # Check if accidentally entered control message
                     print('Invalid username, please select a user from the active users list.')
                     notValid = True
                 elif ',' in dest:
-                    # Check if group message
+                # Check if group message
                     users = dest.split(',')
                     userstring = ''
                     for name in users:
@@ -185,24 +227,26 @@ def main_loop():
                             userstring += name.strip()
                             if not name == users[len(users)-1]:
                                 userstring += ', '
-                    print("Enter a name for your new message group of users: %s" % userstring)
-                    try:    
-                        groupName = raw_input().strip()
-                    except Exception as e:
-                        groupName = input().strip
+                    # print("Enter a name for your new message group of users: %s" % userstring)
+                    # try:    
+                    #     groupName = raw_input().strip()
+                    # except Exception as e:
+                    #     groupName = input().strip
                     
                     # Set group name and add to destination
-                    user_groups[groupName] = userstring
+                    # user_groups[groupName] = userstring
                     dest = userstring
+                
                 elif dest =='none' or dest =='no one' or dest =='0' or dest == '' or dest == './exit':
-                    print("No user selected. Enter ./user to select a user to message.")
+                    print("\nNo user selected. Enter ./user to select a user to message.")
                     dest = "no one"
             print("Currently messaging %s" % dest)
             initial_setup= False
         elif not initial_setup:
         # if this is not the first loop iteration, dest is already initiated, so continue interface loop
             print("\nEnter your message for " + dest 
-                + ". Enter './user' to change destination user and './inbox' to view your message inbox. \nEnter ./exit to leave chat server .")
+                + ". Enter './user' to change destination user and './inbox' to view your message inbox."
+                + "\nEnter ./exit to leave chat server.")
             
             # Included try/catch in all user inputs for conflicting python versions
             try:    
@@ -211,6 +255,7 @@ def main_loop():
                 msg = input()
         
         if msg == '':
+        # Bring up command menu again if message is empty
             pass        
         elif msg == './user':
         # If user is requesting user list then send request and get new user destination input 
@@ -223,11 +268,10 @@ def main_loop():
             notValid = True
             while notValid: 
                 dest = ''
-                print("Enter the name of the user or group you want to message. Enter none to pick later.")
-                
-                # Allow user to enter multiple names delimited by commas to create a group message and ask for an identifier for group
-                print("To create a group message, enter the names of the users you would like to message with each seperated by commas.")
-                
+                print("Enter the name of the user or group you want to message."
+                    + "To create a group message, enter the names of the users you would like to message with each seperated by commas.")
+                print("Enter 'none' or '0' to pick your destination user later.")
+
                 try:    
                     dest = raw_input().strip()
                 except Exception as e:
@@ -248,15 +292,15 @@ def main_loop():
                             userstring += name.strip()
                             if not name == users[len(users)-1]:
                                 userstring += ', '
-                    print("Enter a name for your new message group of users: %s" % userstring)
-                    try:    
-                        groupName = raw_input().strip()
-                    except Exception as e:
-                        groupName = input().strip
+                    # print("Enter a name for your new message group of users: %s" % userstring)
+                    # try:    
+                    #     groupName = raw_input().strip()
+                    # except Exception as e:
+                    #     groupName = input().strip
                     
                     # Set group name and add to destination
-                    user_groups[groupName] = userstring
-                    dest = groupName
+                    # user_groups[groupName] = userstring
+                    dest = userstring
                 elif dest =='none':
                     print("No user selected. Enter ./user to select a user to message.")
                     dest = "no one"
@@ -264,17 +308,17 @@ def main_loop():
         
         elif msg == './inbox': 
         # display all user messages received during this session 
-            print("Chat Message Inbox:")
+            print("\nChat Message Inbox:")
             if len(inbox) == 0: print("No new messages received.")
             else:
                 for m in inbox:
-                    print("  %s -> \n")
+                    print("> %s\n" % m)
             
         elif msg == './exit': 
         # Send exit message to server and end main loop
             stayOnServer = False
             pkt = "#./EXIT" + msg_break + " #./CONFIRM" 
-            print("\nDisconnecting from server ...")
+            print("\nDisconnecting from server ...\n")
             clientSock.sendto(pkt.encode('ascii'), server)
 
         else: 
@@ -303,7 +347,7 @@ def main_loop():
                     except Exception as e: 
                         print("Error sending client msg '%s' to server: %s" % (msg, e) )
                     print("Message sent.")
-    print("GoodBye!\nPress Enter to Close.")
+    print("GoodBye! Press Enter to Close.")
 
     try:    
         raw_input().strip()
@@ -318,23 +362,3 @@ clientSock, server = init_client()
 
 # Initiate main messaging interface loop
 main_loop()
-
-
-## IF ALL ELSE FAILS: Just send back and forth and put inbox on server
-## Right now im going to put main loop in seperate thread and have main thread rcv 
-# Notes: No problem with printing while waiting on input
-
-### New soln: use locks to keep threads synced and thread.join() to only close once they are all finished
-## - Check if I can just run synced sending and recieving threads on same port 
-### User input soln: input takes in you input as an evaluated expression, raw_input gets just the string
-#### IDEA: Lock all thread functions not using socket or just test whether locked threads can use same socket
-#### RECALL: You're running py3 in terminal, but py2 by default. each will throw an error on other's input. 
-# Keep in mind when making exe - quick fix with try/catch
-
-# TODO: 
-# Include user input for ports, server, name
-# send server exit message to close the connection and remove user from active users list
-   # -- Since client is always listening, can server just send out userlist when new user joins?
-# see if printing incoming msgs while waiting on input is possible with
-# After that: 
-  # Allow users to select multiple destinations

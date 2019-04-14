@@ -39,12 +39,26 @@ remoteKillServerCmd = "#./KILLSERVER"
 serverSock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
 # Bind Server Socket to host
-serverHost = '127.0.0.1' # socket.gethostbyname(socket.gethostname()) #
+serverHost = '127.0.0.1' # socket.gethostbyname(socket.gethostname()) 
 serverPort = 9997
-serverSock.bind((serverHost, serverPort))
 bufferSize = 1024
 
-        
+print("Enter the port that the server should use. Enter nothing to use default port %d" % serverPort)
+try:    
+    dest = raw_input().strip()
+except Exception as e:
+    dest = input()
+if not dest == '':
+    serverPort= int(dest)
+else:
+    serverPort = 9997
+try:        
+    serverSock.bind((serverHost, serverPort))
+except Exception as e:
+    serverPort = 9997
+    serverSock.bind((serverHost, serverPort))
+    print("Error with chosen port. Using default %d" % serverPort)
+
 def init_user(clientAddr, clientData, threadName):
 # Add client to lists and send back username and IP address
 
@@ -67,11 +81,10 @@ def init_user(clientAddr, clientData, threadName):
 
 def handle_user(clientAddr, clientData, threadName):
 # Check that user destination is valid, then send message to destination 
-    print("[INFO] [SND_MSG] %s: Message Received from %s:%d - %s" % (threadName, clientAddr[0], clientAddr[1], clientData.decode('utf-8') ))
-    
     # Separate Client UDP Data into rcv user and actual message data 
     rcv_user, user_msg = clientData.decode('utf-8').split(msg_break)[0],clientData.decode('utf-8').split(msg_break)[1]
-    
+    print("[INFO] [SND_MSG] %s: Message Received from %s:%d to be sent to %s" % (threadName, clientAddr[0], clientAddr[1], rcv_user))
+
     if ', ' in rcv_user:
         rcv_group = rcv_user.split(', ')
         for username in rcv_group:
@@ -82,7 +95,8 @@ def handle_user(clientAddr, clientData, threadName):
                 resp = "#./ERROR_INVALID_USER" + msg_break + clientData
                 serverSock.sendto(resp.encode('ascii'), clientAddr)
                 print("[ERROR] [SND_MSG] Destination user is invalid. Cannot send message '%s':%s" 
-                    % (clientData.decode('utf-8'), str(e) ) )
+                    % (clientData.decode('utf-8'), str(e) ) 
+                        )
                 return
         
             # Send users message to intended user
@@ -90,11 +104,33 @@ def handle_user(clientAddr, clientData, threadName):
                 message = "From " + IPs[clientAddr] + ': ' + user_msg      
                 rcv_addr, rcv_port =  users[rcv_user]         
                 serverSock.sendto(message.encode('ascii'), (rcv_addr, rcv_port))
-                print("[INFO] [SND_MSG] User %s has sent message '%s' to  %s at %s:%d .." 
-                    % (IPs[clientAddr], user_msg, rcv_user , rcv_addr, rcv_port)) 
+                # print("[DEBUG] [SND_MSG] user %s's message to %s at %s:%d has been successfully sent .." 
+                    # % (IPs[clientAddr], rcv_user , rcv_addr, rcv_port)) 
             except Exception as e: 
                 print("[ERROR] [SND_MSG] Error sending user message '%s':%s" 
-                    % (clientData.decode('utf-8'), str(e) ) )
+                    % (clientData.decode('utf-8'), str(e) ) 
+                        )
+    else:
+        # check if rcv_user is valid, if not respond with error code and exit function
+        if rcv_user == IPs[clientAddr] or rcv_user not in users.keys():
+            resp = "#./ERROR_INVALID_USER" + msg_break + clientData
+            serverSock.sendto(resp.encode('ascii'), clientAddr)
+            print("[ERROR] [SND_MSG] Destination user is invalid. Cannot send message '%s':%s" 
+                % (clientData.decode('utf-8'), str(e) ) 
+                    )
+            return
+    
+        # Send users message to intended user
+        try: 
+            message = "From " + IPs[clientAddr] + ': ' + user_msg      
+            rcv_addr, rcv_port =  users[rcv_user]         
+            serverSock.sendto(message.encode('ascii'), (rcv_addr, rcv_port))
+            # print("[DEBUG]  [SND_MSG] user %s's message to %s at %s:%d has been successfully sent .." 
+                # % (IPs[clientAddr], rcv_user , rcv_addr, rcv_port)) 
+        except Exception as e: 
+            print("[ERROR] [SND_MSG] Error sending user message '%s':%s" 
+                % (clientData.decode('utf-8'), str(e) ) 
+                    )
 
 def compileUserList(clientName):
     # Compile User list
@@ -147,11 +183,11 @@ def main_loop():
         try:
             clientData, clientAddr = serverSock.recvfrom(bufferSize)
         except Exception as e:
-            print("[ERROR MAIN] Error receiving client datagram with buffer size %d: %s" % (bufferSize, str(e)))
+            print("[ERROR] [MAIN] Error receiving client datagram with buffer size %d: %s" % (bufferSize, str(e)))
         
 
         # Debugging message
-        print("[INFO MAIN] Recieved datagram: %s - From: %s:%d" % (clientData, clientAddr[0], clientAddr[1]))
+        # print("[DEBUG] [MAIN] Recieved datagram: %s - From: %s:%d" % (clientData, clientAddr[0], clientAddr[1]))
 
 
         if msg_break in clientData.decode('utf-8'):
@@ -206,7 +242,9 @@ def main_loop():
             threadCount+=1
             s.start()
 
-try:
-    main_loop()
-except Exception as e: 
-    input("Server FAILURE: %s\nPress Enter to Exit" % e)
+# try:
+#     main_loop()
+# except Exception as e: 
+#     input("Server FAILURE: %s\nPress Enter to Exit" % e)
+
+main_loop()
